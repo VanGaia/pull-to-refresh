@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Потяни — обнови</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <header><img src="icons/48.png" width="38" height="38" alt=""><div><h1>Потяни — обнови</h1><p>Привычный жест. В вашем браузере.</p></div></header>
+  <main>
+    <label class="row primary"><span>Включить расширение</span><input id="enabled" type="checkbox" role="switch" disabled></label>
+    <section aria-label="Способы обновления">
+      <label class="row"><span>Мышь и трекпад</span><input id="wheel" type="checkbox" role="switch" disabled></label>
+      <label class="row"><span>Сенсорный экран</span><input id="touch" type="checkbox" role="switch" disabled></label>
+    </section>
+    <section>
+      <label class="range-title" for="threshold">Длина жеста <output id="length">Обычная</output></label>
+      <input id="threshold" type="range" min="120" max="400" step="20" value="220" disabled>
+      <div class="range-labels"><span>Короткий</span><span>Длинный</span></div>
+    </section>
+    <section class="site">
+      <label class="row"><span>На этом сайте<small id="hostname">Определяем сайт…</small></span><input id="siteEnabled" type="checkbox" role="switch" disabled></label>
+    </section>
+    <aside><b>Как обновить страницу</b><p>В начале страницы сделайте паузу и прокрутите ещё выше. Когда жест станет достаточным, страница обновится автоматически.</p><p>На экране с сенсором — потяните вниз и отпустите.</p></aside>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+  <footer>Настройки хранятся только в этом браузере.</footer>
+</body>
+</html>

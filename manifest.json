@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Потяни — обнови",
+  "version": "1.0.2",
+  "description": "Обновление страницы жестом в её начале: колесо мыши, трекпад и сенсорный экран.",
+  "permissions": ["storage", "activeTab"],
+  "icons": {"16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png"},
+  "action": {
+    "default_title": "Потяни — обнови",
+    "default_popup": "popup.html",
+    "default_icon": {"16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png"}
+  },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle",
+    "all_frames": false
+  }]
+}

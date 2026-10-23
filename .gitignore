@@ -1,0 +1,26 @@
+# Local OS files
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# Local editor and agent settings
+.idea/
+.vscode/
+.agents/
+.codex/
+
+# Credentials and local environment
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+
+# Dependencies, logs, and generated archives
+node_modules/
+coverage/
+*.log
+*.zip
+*.crx
