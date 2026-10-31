@@ -1,10 +1,13 @@
 (() => {
   'use strict';
+  const api = globalThis.browser ?? globalThis.chrome;
   const DEFAULTS = { enabled: true, wheel: true, touch: true, threshold: 220, disabledHosts: [] };
-  const GAP = 260;
-  const WHEEL_CONFIRM_DELAY = 80;
+  const GESTURE_IDLE_TIMEOUT = 260;
+  const REARM_GAP = 120;
+  const WHEEL_CONFIRM_DELAY = 40;
   let settings = { ...DEFAULTS };
   let loaded = false;
+  let pendingSettings = {};
   // Ignore an already-running inertial scroll when the new document loads.
   let lastWheel = performance.now();
   let wheelEligible = false;
@@ -53,7 +56,7 @@
       .pill{box-sizing:border-box;position:absolute;top:18px;left:50%;display:flex;align-items:center;gap:10px;
       padding:10px 15px;border:1px solid var(--ptr-border);border-radius:14px;background:var(--ptr-surface);color:var(--ptr-text);
       backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-      box-shadow:0 4px 20px var(--ptr-shadow);font:500 13px/20px -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;
+      box-shadow:0 4px 20px var(--ptr-shadow);font:500 13px/20px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;white-space:nowrap;
       opacity:0;transform:translate(-50%,-70px);transition:opacity .16s,transform .16s;}
       .pill.visible{opacity:1;transform:translate(-50%,0)}
       .pill.ready{background:var(--ptr-ready);border-color:var(--ptr-ready-border)}
@@ -127,11 +130,12 @@
   function onWheel(event) {
     if (!event.isTrusted || refreshing || touching) return;
     const now = performance.now();
-    const fresh = now - lastWheel > GAP;
+    const gap = wheelEligible ? GESTURE_IDLE_TIMEOUT : REARM_GAP;
+    const fresh = now - lastWheel > gap;
     lastWheel = now;
     if (fresh) {
       reset();
-      wheelEligible = enabled() && settings.wheel && atTop() && !blocked(event);
+      wheelEligible = enabled() && settings.wheel && atTop();
     }
     if (!wheelEligible) return;
     if (!enabled() || !settings.wheel || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey ||
@@ -148,13 +152,13 @@
     if (wheelArmed) return;
     clearTimeout(endTimer);
     wheelArmed = distance >= settings.threshold;
-    endTimer = setTimeout(finish, wheelArmed ? WHEEL_CONFIRM_DELAY : GAP);
+    endTimer = setTimeout(finish, wheelArmed ? WHEEL_CONFIRM_DELAY : GESTURE_IDLE_TIMEOUT);
   }
 
   function onTouchStart(event) {
     if (!event.isTrusted || refreshing) return;
     reset();
-    if (enabled() && settings.touch && atTop() && event.touches.length === 1 && !blocked(event)) {
+    if (!event.defaultPrevented && enabled() && settings.touch && atTop() && event.touches.length === 1 && !blocked(event)) {
       const point = event.touches[0];
       touching = { x: point.clientX, y: point.clientY, id: point.identifier };
     }
@@ -165,33 +169,48 @@
     const point = event.touches[0];
     if (!enabled() || !settings.touch || event.defaultPrevented || !atTop() || event.touches.length !== 1 ||
         point.identifier !== touching.id || blocked(event)) { reset(); return; }
+    if (!event.cancelable) { reset(); return; }
+    if (!updateTouchDistance(point)) return;
+    if (distance === 0) { hide(); return; }
+    event.preventDefault();
+    show();
+  }
+
+  function updateTouchDistance(point) {
+    if (!point || point.identifier !== touching.id) { reset(); return false; }
     const dy = point.clientY - touching.y;
     const dx = point.clientX - touching.x;
-    if (dy < -8 || Math.abs(dx) > Math.max(12, Math.abs(dy))) { reset(); return; }
-    if (dy <= 8) { distance = 0; hide(); return; }
-    if (!event.cancelable) { reset(); return; }
-    event.preventDefault();
+    if (dy < -8 || Math.abs(dx) > Math.max(12, Math.abs(dy))) { reset(); return false; }
     distance = Math.max(0, dy - 8) * 1.8;
-    show();
+    return true;
   }
 
   function onTouchEnd(event) {
     if (!event.isTrusted || !touching || refreshing) return;
-    if (event.touches.length > 0) { reset(); return; }
+    if (event.defaultPrevented || event.touches.length > 0) { reset(); return; }
+    if (!updateTouchDistance(event.changedTouches[0])) return;
     touching = null;
     finish();
   }
 
-  chrome.storage.local.get(DEFAULTS).then(value => {
-    settings = normalize(value);
+  api.storage.local.get(DEFAULTS).then(value => {
+    // A storage notification can arrive before the initial read resolves.
+    settings = normalize({ ...value, ...pendingSettings });
+    pendingSettings = null;
     loaded = true;
   }).catch(() => { loaded = false; });
-  chrome.storage.onChanged.addListener((changes, area) => {
+  api.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
+    const next = { ...settings };
     for (const key of Object.keys(DEFAULTS)) {
-      if (changes[key]) settings[key] = changes[key].newValue ?? DEFAULTS[key];
+      if (changes[key]) {
+        next[key] = changes[key].newValue ?? DEFAULTS[key];
+        if (pendingSettings) pendingSettings[key] = next[key];
+      }
     }
-    settings = normalize(settings);
+    const normalized = normalize(next);
+    if (Object.keys(DEFAULTS).every(key => JSON.stringify(settings[key]) === JSON.stringify(normalized[key]))) return;
+    settings = normalized;
     reset();
   });
   window.addEventListener('wheel', onWheel, { passive: false });
